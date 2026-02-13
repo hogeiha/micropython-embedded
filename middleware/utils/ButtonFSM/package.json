@@ -6,7 +6,7 @@
   "author_email": "1069653183@qq.com",
   "url": "https://github.com/FreakStudioCN/micropython-embedded",
   "urls": [
-    ["ButtonDetect.py", "github:FreakStudioCN/micropython-embedded/middleware/utils/ButtonFSM/code/ButtonDetect.py"],
+    ["ButtonDetect.py", "github:FreakStudioCN/micropython-embedded/middleware/utils/ButtonFSM/code/ButtonDetect.py"]
 
   ],
   "deps": [

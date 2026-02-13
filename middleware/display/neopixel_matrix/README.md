@@ -1,9 +1,10 @@
-# WS2812矩阵驱动库（MicroPython）
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+# GraftSense-WS2812 矩阵模块（MicroPython）
 
 ## 目录
+
 - [简介](#简介)
 - [主要功能](#主要功能)
+- [硬件要求](#硬件要求)
 - [文件说明](#文件说明)
 - [软件设计核心思想](#软件设计核心思想)
 - [使用说明](#使用说明)
@@ -12,181 +13,203 @@
 - [联系方式](#联系方式)
 - [许可协议](#许可协议)
 
+---
+
 ## 简介
-本项目是基于 **MicroPython v1.23.0** 开发的WS2812 LED矩阵驱动库，提供了简洁、高效的API接口，支持WS2812矩阵的像素控制、动画播放、文字滚动、图像渲染等功能。驱动库封装了底层硬件操作，适配不同的WS2812排列布局（行优先/蛇形）、RGB颜色顺序、画面翻转/旋转等场景，同时支持Gamma校正、亮度调节、局部刷新等优化特性，可快速实现各类LED矩阵显示效果。
+
+本项目是 **FreakStudio GraftSense WS2812 LED矩阵模块** 的MicroPython驱动库，专为嵌入式开发场景设计。它提供了灵活的图形绘制、动画控制和色彩管理能力，适用于电子DIY灯光秀、创客编程、信息显示与装饰等场景。模块兼容Grove接口标准，支持级联扩展，可轻松构建更大尺寸的灯光矩阵。
+
+---
 
 ## 主要功能
 
-1. **基础显示控制**：支持像素点/线/面绘制、全屏填充、局部区域刷新；
-2. **颜色处理**：内置RGB565常用颜色常量，支持RGB565与RGB888格式互转、Gamma校正、亮度调节（0~1）；
-3. **布局适配**：支持行优先（LAYOUT_ROW）、蛇形（LAYOUT_SNAKE）两种矩阵排列方式，支持画面水平/垂直翻转、90/180/270°旋转；
-4. **动画特效**：提供颜色填充、滚动线条、循环动画等预制特效，支持自定义帧率的动画播放；
-5. **图像渲染**：支持加载JSON格式的RGB565图像数据（文件/字符串/字典），支持多帧动画循环播放；
-6. **文字滚动**：支持上下左右四个方向的文字滚动，可自定义文字/背景颜色、滚动速度和次数；
-7. **工程化扩展**：支持通过UART串口发送RGB888格式的像素数据，便于外接主控/显示设备；
-8. **性能优化**：基于`micropython.native`装饰器优化核心方法，支持循环滚动（wrap）和普通滚动两种模式。
+- **矩阵布局适配**：支持行优先（row）和蛇形（snake）两种像素排列方式，兼容不同硬件设计
+- **颜色顺序配置**：支持RGB、GRB、BGR等6种颜色输出顺序，适配各类WS2812模块
+- **色彩管理**：内置Gamma校正、亮度调节和三色通道平衡，提升显示色准与视觉效果
+- **高效刷新**：支持局部刷新和全屏刷新，减少不必要的像素数据传输
+- **图形绘制**：继承`framebuf`模块，提供点、线、填充、滚动等基础图形操作
+- **图像支持**：支持JSON格式的RGB565图像数据，可直接从字符串或文件加载并显示
+- **动画扩展**：提供循环滚动和普通滚动两种动画模式，支持自定义帧率控制
+- **串口输出**：支持通过UART发送RGB888像素数据，适用于光链像素场景
+
+---
+
+## 硬件要求
+
+- **核心模块**：FreakStudio GraftSense WS2812 LED矩阵模块（如8×8、16×16等尺寸）
+- **开发环境**：MicroPython v1.23.0 及以上版本（如Raspberry Pi Pico等开发板）
+- **连接方式**：WS2812 DIN引脚连接至开发板GPIO（示例中使用Pin(6)），模块需5V独立供电
+- **电源规格**：模块含64个WS2812B-5050RGB灯珠时，5V供电下最大功耗可达10W，需确保电源输入稳定可靠
+
+---
 
 ## 文件说明
 
-| 文件名 | 功能说明 |
-|--------|----------|
-| `neopixel_matrix.py` | WS2812矩阵核心驱动类，封装了FrameBuffer、Neopixel底层操作，提供颜色转换、图像渲染、滚动、刷新等核心API； |
-| `main.py` | 测试示例代码，包含颜色填充、滚动线条、JSON图像动画、文字滚动、UART数据发送等功能的演示； |
+| 文件名               | 功能描述                                                                 |
+|----------------------|--------------------------------------------------------------------------|
+| `neopixel_matrix.py` | 核心驱动库，定义`NeopixelMatrix`类，封装所有矩阵控制与显示功能           |
+| `main.py`            | 测试与示例代码，包含颜色填充、滚动动画、图像播放等功能演示               |
+
+---
 
 ## 软件设计核心思想
 
-1. **封装与抽象**：基于`framebuf.FrameBuffer`封装`NeopixelMatrix`类，屏蔽底层硬件差异，对外提供统一的显示控制接口；
-2. **兼容性适配**：支持自定义RGB颜色顺序（RGB/GRB/BGR等6种）、矩阵布局、画面翻转/旋转，适配不同硬件规格的WS2812矩阵；
-3. **标准化数据格式**：定义JSON格式的RGB565图像数据规范，支持文件加载、字符串/字典解析，便于图像数据的复用和扩展；
-4. **性能优先**：核心方法（如`_pos2index`、`rgb565_to_rgb888`、`show`）使用`micropython.native`装饰器编译为原生代码，提升执行效率；
-5. **灵活的滚动机制**：区分循环滚动（wrap=True，无残留）和普通滚动（清除残留区域），满足不同动画场景需求；
-6. **工程化扩展**：提供`send_pixels_via_uart`方法，支持将像素数据通过UART发送，便于与其他设备通信；
-7. **鲁棒性设计**：关键参数（坐标、布局、颜色顺序、亮度等）增加合法性校验，异常场景提供明确的错误提示。
+1. **复用图形能力**：继承`framebuf.FrameBuffer`，直接复用MicroPython内置的图形绘制API，降低开发门槛
+2. **性能优化**：通过`memoryview`管理缓冲区，结合`@micropython.native`装饰器加速关键函数，适配嵌入式资源限制
+3. **灵活适配**：通过布局、颜色顺序、翻转/旋转等参数配置，兼容不同硬件模块的物理设计
+4. **分离渲染逻辑**：将图像加载、色彩处理与像素输出解耦，支持扩展更多图像格式和输出方式
+5. **工程化设计**：提供参数校验、异常处理和文档化接口，提升代码可维护性与易用性
+
+---
 
 ## 使用说明
 
-### 环境要求
+### 1. 环境准备
 
-- 固件：MicroPython v1.23.0；
-- 硬件：支持MicroPython的主控板（如RP2040/ESP32等）、WS2812 LED矩阵；
-- 依赖：内置`neopixel`、`framebuf`、`machine`模块，无需额外安装。
+- 安装MicroPython v1.23.0到目标开发板
+- 将`neopixel_matrix.py`上传至开发板文件系统
 
-### 硬件连接
-1. 将WS2812矩阵的数据引脚连接到主控板指定GPIO（示例中为Pin(6)）；
-2. 若使用UART发送功能，需连接主控板UART_TX引脚（示例中为Pin(16)）到外接设备的UART_RX引脚。
-
-### 快速开始
+### 2. 初始化矩阵
 
 ```python
-# 1. 导入驱动类
-from neopixel_matrix import NeopixelMatrix
 from machine import Pin
+from neopixel_matrix import NeopixelMatrix
 
-# 2. 初始化矩阵（4x1 WS2812矩阵，数据引脚Pin(6)，蛇形布局，亮度0.1，RGB顺序，水平翻转）
+# 初始化8×8矩阵，连接至Pin(6)，蛇形布局，亮度0.2，BRG颜色顺序
 matrix = NeopixelMatrix(
-    width=4, 
-    height=1, 
-    pin=Pin(6), 
-    layout=NeopixelMatrix.LAYOUT_SNAKE, 
-    brightness=0.1, 
-    order=NeopixelMatrix.ORDER_RGB, 
-    flip_h=True
+    width=8,
+    height=8,
+    pin=Pin(6),
+    layout=NeopixelMatrix.LAYOUT_SNAKE,
+    brightness=0.2,
+    order=NeopixelMatrix.ORDER_BRG,
+    flip_v=True
 )
-
-# 3. 基础操作
-matrix.fill(NeopixelMatrix.COLOR_RED)  # 全屏填充红色
-matrix.show()  # 刷新显示
 ```
 
-### 核心API使用
+### 3. 基础操作
 
-- **图像显示**：加载JSON图像文件并显示
+```python
+# 清空矩阵
+matrix.fill(0)
+# 绘制红色像素
+matrix.pixel(2, 3, NeopixelMatrix.COLOR_RED)
+# 绘制蓝色水平线
+matrix.hline(0, 0, 8, NeopixelMatrix.COLOR_BLUE)
+# 刷新显示
+matrix.show()
+```
 
-  ```python
-  matrix.load_rgb565_image("test_image.json", offset_x=0, offset_y=0)
-  matrix.show()
-  ```
+### 4. 图像显示
 
-- **文字滚动**：向左滚动显示"welcome"，白色文字、蓝色背景，滚动3次
+```python
+# 从JSON字符串显示图像
+json_img = json.dumps({
+    "pixels": [0xF800, 0x07E0, 0x001F] * 16,
+    "width": 4
+})
+matrix.show_rgb565_image(json_img, offset_x=2, offset_y=2)
+matrix.show()
 
-  ```python
-  matrix.scroll_text("welcome", 'left', 
-                     text_color=NeopixelMatrix.COLOR_WHITE, 
-                     bg_color=NeopixelMatrix.COLOR_BLUE, 
-                     delay=0.1, 
-                     scroll_count=3)
-  ```
+# 从文件加载图像
+matrix.load_rgb565_image('test_image.json')
+matrix.show()
+```
 
-- **动画播放**：加载30帧动画并以30FPS播放
-
-  ```python
-  frames = load_animation_frames()  # 加载帧数据
-  play_animation(matrix, frames, fps=30)  # 播放动画
-  ```
-
-- **UART发送像素数据**：
-
-  ```python
-  from machine import UART
-  uart0 = UART(0, baudrate=115200, tx=Pin(16), rx=Pin(17))
-  matrix.send_pixels_via_uart(uart=uart0, start_x=0, start_y=0, end_x=3)
-  ```
+---
 
 ## 示例程序
 
-### 1. 颜色填充特效
+### 颜色填充特效
 
 ```python
 def color_wipe(color, delay=0.1):
     matrix.fill(0)
-    for i in range(8):
-        for j in range(8):
+    for i in range(MATRIX_WIDTH):
+        for j in range(MATRIX_HEIGHT):
             matrix.pixel(i, j, color)
             matrix.show()
             time.sleep(delay)
     matrix.fill(0)
 
-# 调用示例：填充红色，延迟0.1秒
-color_wipe(NeopixelMatrix.COLOR_RED, 0.1)
+# 调用示例
+color_wipe(NeopixelMatrix.COLOR_GREEN)
 ```
 
-### 2. 滚动线条动画
+### 滚动线条动画
 
 ```python
-optimized_scrolling_lines()  # 蓝横线下降→红竖线右移动画
+def optimized_scrolling_lines():
+    # 蓝色横线从上向下滚动，背景绿色
+    matrix.fill(0)
+    matrix.hline(0, 0, 8, NeopixelMatrix.COLOR_BLUE)
+    matrix.show()
+    time.sleep(0.5)
+    for _ in range(8):
+        matrix.scroll(0, 1, clear_color=NeopixelMatrix.COLOR_GREEN)
+        matrix.show()
+        time.sleep(0.3)
+    
+    # 红色竖线在青色背景上循环滚动
+    matrix.fill(NeopixelMatrix.COLOR_CYAN)
+    matrix.vline(0, 0, 8, NeopixelMatrix.COLOR_RED)
+    matrix.show()
+    time.sleep(0.5)
+    for _ in range(8):
+        matrix.scroll(1, 0, wrap=True)
+        matrix.show()
+        time.sleep(0.2)
+    matrix.fill(0)
+    matrix.show()
+
+# 调用示例
+optimized_scrolling_lines()
 ```
 
-### 3. JSON图像动画播放
+### JSON图像动画播放
 
 ```python
-animation_frames = [json_img1, json_img2, json_img3]  # 定义帧数据
-animate_images(matrix, animation_frames, delay=0.5)  # 循环播放动画
+animation_frames = [json_img1, json_img2, json_img3]
+
+def animate_images(matrix, frames, delay=0.5):
+    while True:
+        for frame in frames:
+            matrix.show_rgb565_image(frame)
+            matrix.show()
+            time.sleep(delay)
+
+# 调用示例
+animate_images(matrix, animation_frames, delay=0.5)
 ```
 
-### 4. 多方向文字滚动
-
-```python
-# 向左滚动
-scroll_text(matrix, "welcome", 'left', NeopixelMatrix.COLOR_WHITE, NeopixelMatrix.COLOR_BLUE, 0.1, 3)
-# 向上滚动
-scroll_text(matrix, "world", 'up', NeopixelMatrix.COLOR_GREEN, NeopixelMatrix.COLOR_RED, 0.2, 1)
-```
-
-### 5. UART发送像素数据
-
-```python
-for i in range(0, 7):
-    matrix.fill(color[i])
-    matrix.send_pixels_via_uart(uart=uart0,start_x=0, start_y=0,end_x=3)
-    time.sleep_ms(500)
-```
+---
 
 ## 注意事项
 
-1. **参数合法性**：初始化矩阵时，宽度/高度需≥1，布局仅支持`LAYOUT_ROW`/`LAYOUT_SNAKE`，旋转角度仅支持0/90/180/270°；
-2. **亮度范围**：亮度值需在0~1之间，超出范围会抛出`ValueError`；
-3. **滚动限制**：`scroll`方法不支持同时设置水平和垂直滚动步数（xstep/ystep不能同时非零）；
-4. **JSON图像格式**：图像数据需符合规范，`pixels`数组元素需为0~65535的RGB565值，`width`需为正整数且`len(pixels)`能被`width`整除；
-5. **局部刷新**：调用`show(x1, y1, x2, y2)`时，需保证`x1≤x2`且`y1≤y2`，且坐标不超出矩阵范围；
-6. **UART配置**：使用`send_pixels_via_uart`前需确保UART已正确初始化，波特率与外接设备匹配；
-7. **性能考量**：在低性能主控上，建议降低动画帧率（如15~20FPS），避免卡顿；
-8. **引脚冲突**：需确认矩阵数据引脚、UART引脚未与主控板其他功能（如内置LED、按键）冲突。
+1. **电源容量**：模块使用64个WS2812B-5050RGB灯珠时，5V供电下最大功耗可达10W，需确保电源输入足够且稳定，避免压降导致异常
+2. **串口功能限制**：`send_pixels_via_uart`串口输出功能**仅适用于[光链像素](https://github.com/FreakStudioCN/NeoPixDot)**，普通WS2812模块不支持该功能
+3. **布局与颜色顺序**：需根据实际硬件模块调整`layout`和`order`参数，否则像素显示位置和颜色会出现错乱
+4. **内存限制**：大尺寸矩阵或高帧率动画可能占用较多内存，需优化代码或降低分辨率/帧率
+5. **散热设计**：高亮度运行时模块发热明显，建议增加散热措施，避免长时间满负荷工作
+
+---
 
 ## 联系方式
 
-如有任何问题或需要帮助，请通过以下方式联系开发者：
+如有任何问题或需要帮助，请通过以下方式联系开发者：  
+📧 **邮箱**：<liqinghsui@freakstudio.cn>  
+💻 **GitHub**：[https://github.com/FreakStudioCN](https://github.com/FreakStudioCN)  
 
-📧 **邮箱**：liqinghsui@freakstudio.cn
-
-💻 **GitHub**：[https://github.com/FreakStudioCN](https://github.com/FreakStudioCN) 
+---
 
 ## 许可协议
 
-```
+本项目采用 **MIT License** 开源协议。
 
+```text
 MIT License
 
-Copyright (c) 2026 FreakStudio
+Copyright (c) 2025 李清水 (FreakStudio)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -205,5 +228,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
 ```
